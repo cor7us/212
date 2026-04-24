@@ -1,0 +1,258 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans)}
+.cw-wrap{padding:1.5rem 0;max-width:680px}
+.cw-title{font-size:18px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px}
+.cw-sub{font-size:13px;color:var(--color-text-secondary);margin-bottom:1.5rem}
+.cw-layout{display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start}
+.cw-grid-wrap{flex:0 0 auto}
+table.cw{border-collapse:collapse}
+table.cw td{width:32px;height:32px;border:none;padding:0;position:relative}
+.cell{width:32px;height:32px;position:relative}
+.cell.black{background:var(--color-text-primary);border-radius:2px}
+.cell.white{background:var(--color-background-primary);border:1px solid var(--color-border-primary)}
+.cell.white input{position:absolute;inset:0;width:100%;height:100%;border:none;background:transparent;text-align:center;font-size:15px;font-weight:500;text-transform:uppercase;color:var(--color-text-primary);outline:none;cursor:pointer;caret-color:transparent}
+.cell.white input.active{background:var(--color-background-info)}
+.cell.white input.correct{background:#EAF3DE;color:#27500A}
+.cell.white input.wrong{background:#FCEBEB;color:#A32D2D}
+.cell.white input.star{background:#FAEEDA;color:#633806}
+.cell-num{position:absolute;top:2px;left:2px;font-size:7px;font-weight:500;color:var(--color-text-secondary);pointer-events:none;z-index:2;line-height:1}
+.clues-panel{flex:1;min-width:220px}
+.clues-section{margin-bottom:1.25rem}
+.clues-section h3{font-size:13px;font-weight:500;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.6rem}
+.clue-item{font-size:13px;color:var(--color-text-primary);margin-bottom:.4rem;cursor:pointer;border-radius:4px;padding:2px 4px;line-height:1.45}
+.clue-item:hover{background:var(--color-background-secondary)}
+.clue-item.star-clue .num{color:#BA7517}
+.clue-item span.num{font-weight:500;color:var(--color-text-secondary);margin-right:4px;min-width:20px;display:inline-block}
+.clue-item.active-clue{background:var(--color-background-info)}
+.btn-row{display:flex;gap:8px;margin-top:1.25rem;flex-wrap:wrap}
+button{font-size:13px;padding:6px 14px;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-md);background:var(--color-background-primary);color:var(--color-text-primary);cursor:pointer}
+button:hover{background:var(--color-background-secondary)}
+.status{font-size:13px;color:var(--color-text-secondary);margin-top:.75rem;min-height:18px}
+</style>
+
+<div class="cw-wrap">
+<div class="cw-title">Boundaries in Motion — Crossword</div>
+<div class="cw-sub">IBVPs in Materials Science &nbsp;·&nbsp; Click a clue or cell to begin &nbsp;·&nbsp; ★ = special entry</div>
+
+<div class="cw-layout">
+<div class="cw-grid-wrap">
+<table class="cw" id="grid"></table>
+</div>
+<div class="clues-panel">
+<div class="clues-section">
+<h3>Across</h3>
+<div id="across-clues"></div>
+</div>
+<div class="clues-section">
+<h3>Down</h3>
+<div id="down-clues"></div>
+</div>
+<div class="btn-row">
+<button onclick="checkAll()">Check</button>
+<button onclick="revealAll()">Reveal</button>
+<button onclick="clearAll()">Clear</button>
+</div>
+<div class="status" id="status"></div>
+</div>
+</div>
+</div>
+
+<script>
+const ROWS=15,COLS=13;
+const WORDS=[
+  {word:"DIRICHLET",  dir:"A",r:0,c:0,  num:1,  clue:"BC type fixing the value at the boundary (e.g., surface temperature)"},
+  {word:"NEUMANN",    dir:"A",r:2,c:0,  num:5,  clue:"BC type prescribing the flux (derivative) at the boundary"},
+  {word:"FOURIER",    dir:"A",r:4,c:0,  num:9,  clue:"Dimensionless number: αt/L² — governs transient heat conduction"},
+  {word:"PARABOLIC",  dir:"A",r:6,c:0,  num:13, clue:"PDE class of the diffusion/heat equation; smoothes disturbances"},
+  {word:"ERFC",       dir:"A",r:8,c:0,  num:17, clue:"Complementary error function used in semi-infinite diffusion solutions"},
+  {word:"CARBURIZE",  dir:"A",r:10,c:0, num:20, clue:"Process of enriching steel surface with carbon — a classic diffusion IBVP"},
+  {word:"BIOT",       dir:"A",r:12,c:0, num:23, clue:"Dimensionless number: hL/k — ratio of convection to conduction resistance"},
+  {word:"SHIVNANDI",  dir:"A",r:14,c:0, num:25, clue:"★ MLL212 Best TA — the boundary guardian of this course!", star:true},
+
+  {word:"DIFFUSIVITY",dir:"D",r:0,c:0,  num:1,  clue:"Material property α or D in the parabolic PDE (m²/s)"},
+  {word:"ROBIN",      dir:"D",r:0,c:3,  num:2,  clue:"Mixed BC type combining value and flux (Newton's cooling law)"},
+  {word:"INITIAL",    dir:"D",r:0,c:5,  num:3,  clue:"Condition at t=0 needed to uniquely solve a time-dependent PDE"},
+  {word:"CRANK",      dir:"D",r:0,c:7,  num:4,  clue:"___ -Nicolson: implicit finite-difference scheme, unconditionally stable"},
+  {word:"HYPERBOLIC", dir:"D",r:2,c:2,  num:6,  clue:"PDE class of the wave equation; disturbances travel at finite speed"},
+  {word:"ELLIPTIC",   dir:"D",r:2,c:4,  num:7,  clue:"PDE class for static equilibrium problems (e.g., Laplace equation)"},
+  {word:"QUENCH",     dir:"D",r:2,c:9,  num:8,  clue:"Rapid cooling of hot metal — the canonical heat-conduction IBVP"},
+  {word:"EIGEN",      dir:"D",r:4,c:1,  num:10, clue:"___ function: basis of Fourier-series separation-of-variables solution"},
+  {word:"MARTENSITE", dir:"D",r:4,c:6,  num:11, clue:"Hard microstructure formed if steel center cools below Ms temperature"},
+  {word:"FLUX",       dir:"D",r:4,c:11, num:12, clue:"Rate of heat or mass transfer per unit area — set by Neumann BC"},
+];
+
+const grid=Array.from({length:ROWS},()=>Array(COLS).fill(null));
+const starCells=new Set();
+WORDS.forEach(({word,dir,r,c,star})=>{
+  for(let i=0;i<word.length;i++){
+    const row=dir==="A"?r:r+i;
+    const col=dir==="A"?c+i:c;
+    if(row<ROWS&&col<COLS){
+      grid[row][col]=grid[row][col]||{};
+      grid[row][col].letter=word[i];
+      if(star) starCells.add(`${row},${col}`);
+    }
+  }
+});
+
+const numMap={};
+WORDS.forEach(({r,c,num})=>{
+  const key=`${r},${c}`;
+  if(!numMap[key]||numMap[key]>num) numMap[key]=num;
+});
+
+const tbl=document.getElementById("grid");
+const inputs={};
+for(let r=0;r<ROWS;r++){
+  const tr=document.createElement("tr");
+  for(let c=0;c<COLS;c++){
+    const td=document.createElement("td");
+    const div=document.createElement("div");
+    if(grid[r][c]){
+      div.className="cell white";
+      const inp=document.createElement("input");
+      inp.maxLength=1;
+      inp.dataset.r=r;inp.dataset.c=c;
+      if(starCells.has(`${r},${c}`)) inp.classList.add("star");
+      inputs[`${r},${c}`]=inp;
+      if(numMap[`${r},${c}`]){
+        const span=document.createElement("span");
+        span.className="cell-num";
+        span.textContent=numMap[`${r},${c}`];
+        div.appendChild(span);
+      }
+      inp.addEventListener("input",e=>{
+        e.target.value=e.target.value.toUpperCase().slice(-1);
+        e.target.classList.remove("correct","wrong");
+        if(starCells.has(`${r},${c}`)) e.target.classList.add("star");
+        advanceCursor(r,c);
+      });
+      inp.addEventListener("keydown",e=>{
+        if(e.key==="Backspace"&&!e.target.value) retreatCursor(r,c);
+        if(e.key==="ArrowRight") moveFocus(r,c+1);
+        if(e.key==="ArrowLeft") moveFocus(r,c-1);
+        if(e.key==="ArrowDown") moveFocus(r+1,c);
+        if(e.key==="ArrowUp") moveFocus(r-1,c);
+      });
+      inp.addEventListener("focus",()=>highlightWord(r,c));
+      div.appendChild(inp);
+    } else {
+      div.className="cell black";
+    }
+    td.appendChild(div);tr.appendChild(td);
+  }
+  tbl.appendChild(tr);
+}
+
+let activeDir="A";
+function highlightWord(r,c){
+  Object.values(inputs).forEach(i=>{
+    i.classList.remove("active");
+  });
+  let matched=false;
+  WORDS.forEach(({word,dir,r:wr,c:wc})=>{
+    if(dir===activeDir){
+      for(let i=0;i<word.length;i++){
+        const tr2=dir==="A"?wr:wr+i,tc=dir==="A"?wc+i:wc;
+        if(tr2===r&&tc===c){
+          for(let j=0;j<word.length;j++){
+            const hr=dir==="A"?wr:wr+j,hc=dir==="A"?wc+j:wc;
+            if(inputs[`${hr},${hc}`]){inputs[`${hr},${hc}`].classList.add("active");matched=true;}
+          }
+          highlightClue(dir,wr,wc);
+        }
+      }
+    }
+  });
+  if(!matched){
+    activeDir=activeDir==="A"?"D":"A";
+    highlightWord(r,c);
+  }
+}
+
+let activeClueEl=null;
+function highlightClue(dir,r,c){
+  if(activeClueEl) activeClueEl.classList.remove("active-clue");
+  const w=WORDS.find(w=>w.dir===dir&&w.r===r&&w.c===c);
+  if(w){
+    const el=document.getElementById(`clue-${dir}-${w.num}`);
+    if(el){el.classList.add("active-clue");activeClueEl=el;}
+  }
+}
+
+function advanceCursor(r,c){
+  if(activeDir==="A"&&inputs[`${r},${c+1}`]) inputs[`${r},${c+1}`].focus();
+  else if(activeDir==="D"&&inputs[`${r+1},${c}`]) inputs[`${r+1},${c}`].focus();
+}
+function retreatCursor(r,c){
+  if(activeDir==="A"&&inputs[`${r},${c-1}`]) inputs[`${r},${c-1}`].focus();
+  else if(activeDir==="D"&&inputs[`${r-1},${c}`]) inputs[`${r-1},${c}`].focus();
+}
+function moveFocus(r,c){if(inputs[`${r},${c}`]) inputs[`${r},${c}`].focus();}
+
+const acrossClues=document.getElementById("across-clues");
+const downClues=document.getElementById("down-clues");
+WORDS.filter(w=>w.dir==="A").sort((a,b)=>a.num-b.num).forEach(w=>{
+  const d=document.createElement("div");
+  d.className="clue-item"+(w.star?" star-clue":"");
+  d.id=`clue-A-${w.num}`;
+  d.innerHTML=`<span class="num">${w.num}${w.star?"★":""}.</span>${w.clue}`;
+  d.addEventListener("click",()=>{
+    activeDir="A";
+    if(inputs[`${w.r},${w.c}`]) inputs[`${w.r},${w.c}`].focus();
+  });
+  acrossClues.appendChild(d);
+});
+WORDS.filter(w=>w.dir==="D").sort((a,b)=>a.num-b.num).forEach(w=>{
+  const d=document.createElement("div");
+  d.className="clue-item";d.id=`clue-D-${w.num}`;
+  d.innerHTML=`<span class="num">${w.num}.</span>${w.clue}`;
+  d.addEventListener("click",()=>{
+    activeDir="D";
+    if(inputs[`${w.r},${w.c}`]) inputs[`${w.r},${w.c}`].focus();
+  });
+  downClues.appendChild(d);
+});
+
+function checkAll(){
+  let correct=0;
+  const cellKeys=Object.keys(inputs);
+  cellKeys.forEach(key=>{
+    const inp=inputs[key];
+    const [r,c]=key.split(",").map(Number);
+    const expected=grid[r][c].letter;
+    if(inp.value){
+      if(inp.value===expected){
+        inp.classList.add("correct");inp.classList.remove("wrong");
+        if(!starCells.has(key)) inp.classList.remove("star");
+        correct++;
+      } else {
+        inp.classList.add("wrong");inp.classList.remove("correct","star");
+      }
+    }
+  });
+  const allFilled=cellKeys.every(k=>inputs[k].value);
+  if(allFilled&&correct===cellKeys.length) document.getElementById("status").textContent="Solved! Every cell correct — Shivnandi would be proud!";
+  else document.getElementById("status").textContent=`${correct} of ${cellKeys.length} cells correct.`;
+}
+function revealAll(){
+  Object.keys(inputs).forEach(key=>{
+    const [r,c]=key.split(",").map(Number);
+    const inp=inputs[key];
+    inp.value=grid[r][c].letter;
+    inp.classList.add("correct");
+    inp.classList.remove("wrong","active");
+    if(starCells.has(key)) inp.classList.add("star");
+  });
+  document.getElementById("status").textContent="Revealed! The legend: SHIVNANDI.";
+}
+function clearAll(){
+  Object.values(inputs).forEach(i=>{
+    i.value="";i.classList.remove("correct","wrong","active");
+  });
+  Object.keys(inputs).forEach(key=>{if(starCells.has(key)) inputs[key].classList.add("star");});
+  document.getElementById("status").textContent="";
+}
+</script>
